@@ -217,8 +217,10 @@ void wsa_capture::capture_loop() {
       wsa::pulse::target_t target;
       if (control.resolve_target("", target) && target.monitor != current_monitor) {
         WSA_LOG_INFO << "default sink moved to " << target.sink << ", reopening capture";
+        /* Flagged by the reopen path below, which is also what reports a
+         * reopen caused by a failure, so this is not flagged here: doing both
+         * would report a single reopen twice. */
         mic.reset();
-        pending_flags.fetch_or(WSA_FRAME_REINIT | WSA_FRAME_DISCONTINUITY);
       }
     }
   }
