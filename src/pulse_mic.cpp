@@ -20,15 +20,15 @@
 #include <algorithm>
 #include <cstring>
 
-namespace wsa {
+namespace weba {
   void pa_simple_deleter_t::operator()(struct pa_simple *stream) const noexcept {
     if (stream) {
       pa_simple_free(stream);
     }
   }
-}  // namespace wsa
+}  // namespace weba
 
-namespace wsa::pulse {
+namespace weba::pulse {
   namespace {
     /* Channel layouts indexed the way Sunshine's `position_mapping[]` is: front
      * to back, matching the speaker order Opus uses. */
@@ -84,17 +84,17 @@ namespace wsa::pulse {
     }
 
     /// @brief Map our sample format onto PulseAudio's.
-    bool map_sample_format(wsa_sample_format format, pa_sample_format_t &out, uint32_t &bytes_per_sample) {
+    bool map_sample_format(weba_sample_format format, pa_sample_format_t &out, uint32_t &bytes_per_sample) {
       switch (format) {
-        case WSA_SAMPLE_F32LE:
+        case WEBA_SAMPLE_F32LE:
           out = PA_SAMPLE_FLOAT32LE;
           bytes_per_sample = 4;
           return true;
-        case WSA_SAMPLE_S16LE:
+        case WEBA_SAMPLE_S16LE:
           out = PA_SAMPLE_S16LE;
           bytes_per_sample = 2;
           return true;
-        case WSA_SAMPLE_S32LE:
+        case WEBA_SAMPLE_S32LE:
           out = PA_SAMPLE_S32LE;
           bytes_per_sample = 4;
           return true;
@@ -102,12 +102,12 @@ namespace wsa::pulse {
       return false;
     }
 
-    std::size_t bytes_per_sample_of(wsa_sample_format format) {
+    std::size_t bytes_per_sample_of(weba_sample_format format) {
       switch (format) {
-        case WSA_SAMPLE_S16LE:
+        case WEBA_SAMPLE_S16LE:
           return 2;
-        case WSA_SAMPLE_F32LE:
-        case WSA_SAMPLE_S32LE:
+        case WEBA_SAMPLE_F32LE:
+        case WEBA_SAMPLE_S32LE:
           return 4;
       }
       return 0;
@@ -168,8 +168,8 @@ namespace wsa::pulse {
     attr.fragsize = fragsize;
 
     int status = PA_OK;
-    auto stream = wsa::pa_simple_ptr_t {pa_simple_new(nullptr, "wsaudio", PA_STREAM_RECORD, monitor.c_str(),
-                                                      "wsaudio-record", &spec, &channel_map, &attr, &status)};
+    auto stream = weba::pa_simple_ptr_t {pa_simple_new(nullptr, "webaudio", PA_STREAM_RECORD, monitor.c_str(),
+                                                      "webaudio-record", &spec, &channel_map, &attr, &status)};
     if (!stream) {
       error = std::string {"pa_simple_new() failed: "} + pa_strerror(status);
       return nullptr;
@@ -178,7 +178,7 @@ namespace wsa::pulse {
     auto mic = std::unique_ptr<mic_t> {new mic_t {}};
     mic->_stream = std::move(stream);
 
-    WSA_LOG_INFO << "recording " << monitor << " at " << format.sample_rate << " Hz, " << format.channels
+    WEBA_LOG_INFO << "recording " << monitor << " at " << format.sample_rate << " Hz, " << format.channels
                  << " ch, " << format.frame_samples << " frames/read";
     return mic;
   }
@@ -197,4 +197,4 @@ namespace wsa::pulse {
     return true;
   }
 
-}  // namespace wsa::pulse
+}  // namespace weba::pulse

@@ -22,27 +22,27 @@ find_package(Threads REQUIRED)
 # libpulse-simple is the backend; it carries libpulse and pthread along with it.
 pkg_check_modules(PULSE REQUIRED IMPORTED_TARGET libpulse-simple)
 
-set(WSAUDIO_SOURCES
+set(WEBAUDIO_SOURCES
   src/capture.cpp
   src/log.cpp
   src/pulse_control.cpp
   src/pulse_mic.cpp)
 
-add_library(wsaudio SHARED ${WSAUDIO_SOURCES})
+add_library(webaudio SHARED ${WEBAUDIO_SOURCES})
 
-target_include_directories(wsaudio
+target_include_directories(webaudio
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-target_link_libraries(wsaudio PRIVATE PkgConfig::PULSE Threads::Threads)
+target_link_libraries(webaudio PRIVATE PkgConfig::PULSE Threads::Threads)
 
-target_compile_options(wsaudio PRIVATE -Wall -Wextra -Wpedantic)
+target_compile_options(webaudio PRIVATE -Wall -Wextra -Wpedantic)
 
-# Only the wsa_* entry points are part of the ABI; everything else is hidden.
-set_target_properties(wsaudio PROPERTIES
+# Only the weba_* entry points are part of the ABI; everything else is hidden.
+set_target_properties(webaudio PROPERTIES
   VERSION ${PROJECT_VERSION}
   SOVERSION ${PROJECT_VERSION_MAJOR}
   CXX_VISIBILITY_PRESET hidden
@@ -50,25 +50,25 @@ set_target_properties(wsaudio PROPERTIES
 
 # Small CLI that dumps captured audio to a WAV file. Written in C on purpose:
 # it is the proof that the ABI is callable from plain C.
-add_executable(wsacap-dump examples/wsacap-dump.c)
-target_link_libraries(wsacap-dump PRIVATE wsaudio)
+add_executable(webacap-dump examples/webacap-dump.c)
+target_link_libraries(webacap-dump PRIVATE webaudio)
 
 # Self test. Needs a running audio server, so it is registered as a test but is
 # expected to be run on a live session.
-add_executable(wsaudio_selftest tests/wsaudio_selftest.cpp)
-target_link_libraries(wsaudio_selftest PRIVATE wsaudio)
+add_executable(webaudio_selftest tests/webaudio_selftest.cpp)
+target_link_libraries(webaudio_selftest PRIVATE webaudio)
 
 enable_testing()
-add_test(NAME selftest COMMAND wsaudio_selftest)
+add_test(NAME selftest COMMAND webaudio_selftest)
 
 include(GNUInstallDirs)
 
-configure_file(cmake/wsacapture.pc.in wsacapture.pc @ONLY)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wsacapture.pc
+configure_file(cmake/webacapture.pc.in webacapture.pc @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/webacapture.pc
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
-install(TARGETS wsaudio
+install(TARGETS webaudio
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(FILES include/wsacapture.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(TARGETS wsacap-dump RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES include/webacapture.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(TARGETS webacap-dump RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

@@ -12,7 +12,7 @@
 #include <cstdlib>
 #include <mutex>
 
-namespace wsa::log {
+namespace weba::log {
   namespace {
     std::atomic<level_t> g_level {level_t::info};
     std::atomic<bool> g_level_initialized {false};
@@ -32,13 +32,13 @@ namespace wsa::log {
       return "?";
     }
 
-    /// Read $WSA_LOG_LEVEL once, so the level can be set without a C API for it.
+    /// Read $WEBA_LOG_LEVEL once, so the level can be set without a C API for it.
     void init_from_env() {
       bool expected = false;
       if (!g_level_initialized.compare_exchange_strong(expected, true)) {
         return;
       }
-      if (const char *env = std::getenv("WSA_LOG_LEVEL")) {
+      if (const char *env = std::getenv("WEBA_LOG_LEVEL")) {
         level_t parsed {};
         if (parse_level(env, parsed)) {
           g_level.store(parsed);
@@ -58,7 +58,7 @@ namespace wsa::log {
   }
 
   bool enabled(level_t level) {
-    return static_cast<int>(level) <= static_cast<int>(wsa::log::level());
+    return static_cast<int>(level) <= static_cast<int>(weba::log::level());
   }
 
   bool parse_level(const std::string &name, level_t &out) {
@@ -84,8 +84,8 @@ namespace wsa::log {
 
   line_t::~line_t() {
     std::scoped_lock lock {g_write_lock};
-    std::fprintf(stderr, "[wsaudio] %-7s %s\n", to_string(_level), _stream.str().c_str());
+    std::fprintf(stderr, "[webaudio] %-7s %s\n", to_string(_level), _stream.str().c_str());
     std::fflush(stderr);
   }
 
-}  // namespace wsa::log
+}  // namespace weba::log

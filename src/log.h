@@ -10,7 +10,7 @@
 #include <sstream>
 #include <string>
 
-namespace wsa::log {
+namespace weba::log {
 
   enum class level_t {
     error = 0,
@@ -22,7 +22,7 @@ namespace wsa::log {
   /// @brief Set the minimum level that is emitted.
   void set_level(level_t level);
 
-  /// @brief Current minimum level. Defaults to info, or to $WSA_LOG_LEVEL.
+  /// @brief Current minimum level. Defaults to info, or to $WEBA_LOG_LEVEL.
   level_t level();
 
   /// @brief Whether a level would be emitted. Used to skip formatting work.
@@ -56,19 +56,19 @@ namespace wsa::log {
     std::ostringstream _stream;
   };
 
-}  // namespace wsa::log
+}  // namespace weba::log
 
 /* Logging must never run on the real-time path; these are only used from the
  * control layer, the capture thread and the public entry points. */
-#define WSA_LOG_ERROR \
-  if (wsa::log::enabled(wsa::log::level_t::error)) \
-  wsa::log::line_t {wsa::log::level_t::error}
-#define WSA_LOG_WARNING \
-  if (wsa::log::enabled(wsa::log::level_t::warning)) \
-  wsa::log::line_t {wsa::log::level_t::warning}
-#define WSA_LOG_INFO \
-  if (wsa::log::enabled(wsa::log::level_t::info)) \
-  wsa::log::line_t {wsa::log::level_t::info}
-#define WSA_LOG_DEBUG \
-  if (wsa::log::enabled(wsa::log::level_t::debug)) \
-  wsa::log::line_t {wsa::log::level_t::debug}
+#define WEBA_LOG_ERROR \
+  if (weba::log::enabled(weba::log::level_t::error)) \
+  weba::log::line_t {weba::log::level_t::error}
+#define WEBA_LOG_WARNING \
+  if (weba::log::enabled(weba::log::level_t::warning)) \
+  weba::log::line_t {weba::log::level_t::warning}
+#define WEBA_LOG_INFO \
+  if (weba::log::enabled(weba::log::level_t::info)) \
+  weba::log::line_t {weba::log::level_t::info}
+#define WEBA_LOG_DEBUG \
+  if (weba::log::enabled(weba::log::level_t::debug)) \
+  weba::log::line_t {weba::log::level_t::debug}

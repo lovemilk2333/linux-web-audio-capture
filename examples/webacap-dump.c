@@ -1,18 +1,18 @@
 /*
- * wsacap-dump.c - record the desktop to a WAV file.
+ * webacap-dump.c - record the desktop to a WAV file.
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * This is written in C99 on purpose: it is the proof that wsacapture.h is a
+ * This is written in C99 on purpose: it is the proof that webacapture.h is a
  * pure C ABI and can be consumed without a C++ compiler.
  *
- * Usage: wsacap-dump [output.wav] [seconds] [sink]
+ * Usage: webacap-dump [output.wav] [seconds] [sink]
  *
  * Prints a per-second summary including how many frames were synthesized
  * silence, which is the interesting number when nothing is playing.
  */
 
-#include "wsacapture.h"
+#include "webacapture.h"
 
 #include <inttypes.h>
 #include <stdint.h>
@@ -40,27 +40,27 @@ static double now_seconds(void) {
 }
 
 /* Size of one sample of a given format, in bytes. */
-static size_t sample_bytes(wsa_sample_format format) {
-  return format == WSA_SAMPLE_S16LE ? 2u : 4u;
+static size_t sample_bytes(weba_sample_format format) {
+  return format == WEBA_SAMPLE_S16LE ? 2u : 4u;
 }
 
 /* WAV uses format 3 for IEEE float and 1 for integer PCM. */
-static uint16_t wav_format_code(wsa_sample_format format) {
-  return format == WSA_SAMPLE_F32LE ? 3u : 1u;
+static uint16_t wav_format_code(weba_sample_format format) {
+  return format == WEBA_SAMPLE_F32LE ? 3u : 1u;
 }
 
 static const char *flag_names(uint32_t flags, char *buffer, size_t size) {
   buffer[0] = '\0';
-  if (flags & WSA_FRAME_DISCONTINUITY) {
+  if (flags & WEBA_FRAME_DISCONTINUITY) {
     strncat(buffer, "discontinuity ", size - strlen(buffer) - 1);
   }
-  if (flags & WSA_FRAME_SILENCE) {
+  if (flags & WEBA_FRAME_SILENCE) {
     strncat(buffer, "silence ", size - strlen(buffer) - 1);
   }
-  if (flags & WSA_FRAME_UNDERRUN) {
+  if (flags & WEBA_FRAME_UNDERRUN) {
     strncat(buffer, "underrun ", size - strlen(buffer) - 1);
   }
-  if (flags & WSA_FRAME_REINIT) {
+  if (flags & WEBA_FRAME_REINIT) {
     strncat(buffer, "reinit ", size - strlen(buffer) - 1);
   }
   return buffer;
@@ -71,31 +71,31 @@ int main(int argc, char **argv) {
   const double seconds = argc > 2 ? atof(argv[2]) : 5.0;
   const char *sink = argc > 3 ? argv[3] : NULL;
 
-  wsa_config cfg;
-  wsa_config_defaults(&cfg);
+  weba_config cfg;
+  weba_config_defaults(&cfg);
   cfg.sink = sink;
 
-  printf("wsacapture %s\n", wsa_version_string());
+  printf("webacapture %s\n", weba_version_string());
 
-  wsa_capture *capture = NULL;
-  int status = wsa_capture_create(&cfg, &capture);
-  if (status != WSA_OK) {
-    fprintf(stderr, "wsa_capture_create: %s\n", wsa_strerror(status));
+  weba_capture *capture = NULL;
+  int status = weba_capture_create(&cfg, &capture);
+  if (status != WEBA_OK) {
+    fprintf(stderr, "weba_capture_create: %s\n", weba_strerror(status));
     return 1;
   }
 
-  status = wsa_capture_start(capture);
-  if (status != WSA_OK) {
-    fprintf(stderr, "wsa_capture_start: %s: %s\n", wsa_strerror(status), wsa_capture_last_error(capture));
-    wsa_capture_destroy(capture);
+  status = weba_capture_start(capture);
+  if (status != WEBA_OK) {
+    fprintf(stderr, "weba_capture_start: %s: %s\n", weba_strerror(status), weba_capture_last_error(capture));
+    weba_capture_destroy(capture);
     return 1;
   }
 
-  wsa_format_info info;
+  weba_format_info info;
   memset(&info, 0, sizeof(info));
-  if (wsa_capture_get_format(capture, &info) != WSA_OK) {
-    fprintf(stderr, "wsa_capture_get_format failed\n");
-    wsa_capture_destroy(capture);
+  if (weba_capture_get_format(capture, &info) != WEBA_OK) {
+    fprintf(stderr, "weba_capture_get_format failed\n");
+    weba_capture_destroy(capture);
     return 1;
   }
 
@@ -107,7 +107,7 @@ int main(int argc, char **argv) {
   uint8_t *buffer = malloc(frame_bytes);
   if (!buffer) {
     fprintf(stderr, "out of memory\n");
-    wsa_capture_destroy(capture);
+    weba_capture_destroy(capture);
     return 1;
   }
 
@@ -115,7 +115,7 @@ int main(int argc, char **argv) {
   if (!out) {
     fprintf(stderr, "cannot open %s\n", path);
     free(buffer);
-    wsa_capture_destroy(capture);
+    weba_capture_destroy(capture);
     return 1;
   }
 
@@ -146,14 +146,14 @@ int main(int argc, char **argv) {
   double last_report = start;
 
   while (now_seconds() < deadline) {
-    wsa_frame_info frame;
+    weba_frame_info frame;
     memset(&frame, 0, sizeof(frame));
 
     /* A timeout larger than one frame period is right here: the library paces
      * the output itself, so this only bounds how long we block. */
-    status = wsa_capture_read_frame(capture, buffer, info.frame_samples, &frame, 1000);
+    status = weba_capture_read_frame(capture, buffer, info.frame_samples, &frame, 1000);
     if (status < 0) {
-      fprintf(stderr, "wsa_capture_read_frame: %s: %s\n", wsa_strerror(status), wsa_capture_last_error(capture));
+      fprintf(stderr, "weba_capture_read_frame: %s: %s\n", weba_strerror(status), weba_capture_last_error(capture));
       break;
     }
     if (status == 0) {
@@ -162,10 +162,10 @@ int main(int argc, char **argv) {
 
     fwrite(buffer, 1, frame_bytes, out);
     ++frames;
-    if (frame.flags & WSA_FRAME_SILENCE) {
+    if (frame.flags & WEBA_FRAME_SILENCE) {
       ++silent;
     }
-    if (frame.flags & WSA_FRAME_DISCONTINUITY) {
+    if (frame.flags & WEBA_FRAME_DISCONTINUITY) {
       ++gaps;
     }
     dropped += frame.dropped_frames;
@@ -201,6 +201,6 @@ int main(int argc, char **argv) {
   }
 
   free(buffer);
-  wsa_capture_destroy(capture);
+  weba_capture_destroy(capture);
   return 0;
 }

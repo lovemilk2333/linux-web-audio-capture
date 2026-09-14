@@ -1,7 +1,7 @@
 /**
  * @file frame_queue.h
  * @brief Bounded queue of audio frames, handed from the capture thread to the
- *        consumer of wsa_capture_read_frame().
+ *        consumer of weba_capture_read_frame().
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -18,7 +18,7 @@
 #include <utility>
 #include <vector>
 
-namespace wsa {
+namespace weba {
 
   /**
    * @brief A queue of fixed-size frames with drop-oldest overflow.
@@ -158,4 +158,4 @@ namespace wsa {
     bool _closed = false;
   };
 
-}  // namespace wsa
+}  // namespace weba

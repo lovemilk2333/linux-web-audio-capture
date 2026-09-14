@@ -21,12 +21,12 @@
 #include <utility>
 
 /* libpulse-simple's opaque handle. Declared at global scope because that is
- * where libpulse declares it: a forward declaration inside namespace wsa would
+ * where libpulse declares it: a forward declaration inside namespace weba would
  * introduce a distinct, incompatible type. This header stays free of
  * PulseAudio includes on purpose. */
 struct pa_simple;
 
-namespace wsa {
+namespace weba {
 
   /**
    * @brief A one-shot, single-value handoff from a callback to a waiting thread.
@@ -167,4 +167,4 @@ namespace wsa {
   /// @brief Owning pointer to a pa_simple recording stream.
   using pa_simple_ptr_t = std::unique_ptr<::pa_simple, pa_simple_deleter_t>;
 
-}  // namespace wsa
+}  // namespace weba

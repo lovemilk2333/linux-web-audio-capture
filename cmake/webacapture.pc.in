@@ -3,9 +3,9 @@ exec_prefix=${prefix}
 libdir=@CMAKE_INSTALL_FULL_LIBDIR@
 includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
 
-Name: wsacapture
+Name: webacapture
 Description: @PROJECT_DESCRIPTION@
 Version: @PROJECT_VERSION@
 Requires.private: libpulse-simple
-Libs: -L${libdir} -lwsaudio
+Libs: -L${libdir} -lwebaudio
 Cflags: -I${includedir}

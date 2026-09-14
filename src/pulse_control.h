@@ -19,7 +19,7 @@
 struct pa_context;
 struct pa_mainloop;
 
-namespace wsa::pulse {
+namespace weba::pulse {
 
   /// @brief What to record: a sink and the monitor source belonging to it.
   struct target_t {
@@ -46,7 +46,7 @@ namespace wsa::pulse {
     /**
      * @brief Connect to the audio server and wait until the context is ready.
      *
-     * @return WSA_OK, or WSA_ERR_PULSE with the reason in error().
+     * @return WEBA_OK, or WEBA_ERR_PULSE with the reason in error().
      */
     int init();
 
@@ -93,4 +93,4 @@ namespace wsa::pulse {
     std::string _error;
   };
 
-}  // namespace wsa::pulse
+}  // namespace weba::pulse

@@ -12,20 +12,20 @@
 #pragma once
 
 #include "primitives.h"
-#include "wsacapture.h"
+#include "webacapture.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
 
-namespace wsa::pulse {
+namespace weba::pulse {
 
   /// @brief The format a recording stream is opened with.
   struct mic_format_t {
     uint32_t sample_rate = 48000;
     uint32_t channels = 2;
-    wsa_sample_format format = WSA_SAMPLE_F32LE;
+    weba_sample_format format = WEBA_SAMPLE_F32LE;
     uint32_t frame_samples = 960;
   };
 
@@ -69,7 +69,7 @@ namespace wsa::pulse {
   private:
     mic_t() = default;
 
-    wsa::pa_simple_ptr_t _stream;
+    weba::pa_simple_ptr_t _stream;
   };
 
   /**
@@ -80,4 +80,4 @@ namespace wsa::pulse {
    */
   bool channels_supported(uint32_t channels);
 
-}  // namespace wsa::pulse
+}  // namespace weba::pulse

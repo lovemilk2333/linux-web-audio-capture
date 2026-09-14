@@ -12,7 +12,7 @@
 
 #include "log.h"
 #include "primitives.h"
-#include "wsacapture.h"
+#include "webacapture.h"
 
 #include <pulse/error.h>
 #include <pulse/pulseaudio.h>
@@ -20,7 +20,7 @@
 #include <chrono>
 #include <utility>
 
-namespace wsa::pulse {
+namespace weba::pulse {
   namespace {
     /* Sunshine waits on its alarms indefinitely. A bounded wait keeps a lost
      * callback from wedging the caller; 5 s is far longer than any local query
@@ -34,7 +34,7 @@ namespace wsa::pulse {
       std::string error;
     };
 
-    using query_alarm_t = wsa::alarm_t<query_result_t>;
+    using query_alarm_t = weba::alarm_t<query_result_t>;
 
     query_result_t failure(std::string message) {
       query_result_t result;
@@ -129,21 +129,21 @@ namespace wsa::pulse {
     _mainloop = pa_mainloop_new();
     if (!_mainloop) {
       set_error("pa_mainloop_new() failed");
-      return WSA_ERR_PULSE;
+      return WEBA_ERR_PULSE;
     }
 
     pa_mainloop_api *api = pa_mainloop_get_api(_mainloop);
-    _ctx = pa_context_new(api, "wsaudio");
+    _ctx = pa_context_new(api, "webaudio");
     if (!_ctx) {
       set_error("pa_context_new() failed");
-      return WSA_ERR_PULSE;
+      return WEBA_ERR_PULSE;
     }
 
     pa_context_set_state_callback(_ctx, state_callback, this);
 
     if (pa_context_connect(_ctx, nullptr, PA_CONTEXT_NOFLAGS, nullptr) < 0) {
       set_error(pulse_error("pa_context_connect()"));
-      return WSA_ERR_PULSE;
+      return WEBA_ERR_PULSE;
     }
 
     /* The context only makes progress while its main loop runs, so the loop
@@ -160,16 +160,16 @@ namespace wsa::pulse {
       });
       if (!signalled) {
         set_error("timed out connecting to the audio server");
-        return WSA_ERR_PULSE;
+        return WEBA_ERR_PULSE;
       }
       if (!_ready) {
         set_error("audio server connection failed");
-        return WSA_ERR_PULSE;
+        return WEBA_ERR_PULSE;
       }
     }
 
-    WSA_LOG_INFO << "connected to audio server";
-    return WSA_OK;
+    WEBA_LOG_INFO << "connected to audio server";
+    return WEBA_OK;
   }
 
   void control_t::shutdown() {
@@ -225,11 +225,11 @@ namespace wsa::pulse {
       std::scoped_lock lock {_error_lock};
       _error = message;
     }
-    WSA_LOG_ERROR << message;
+    WEBA_LOG_ERROR << message;
   }
 
   bool control_t::query_default_sink(std::string &out) {
-    auto alarm = wsa::make_alarm<query_result_t>();
+    auto alarm = weba::make_alarm<query_result_t>();
 
     /* Unlike the sink query, the caller owns this operation's lifetime: the
      * callback may already have run by the time we wait on the alarm. */
@@ -255,7 +255,7 @@ namespace wsa::pulse {
   }
 
   bool control_t::query_monitor(const std::string &sink, std::string &out) {
-    auto alarm = wsa::make_alarm<query_result_t>();
+    auto alarm = weba::make_alarm<query_result_t>();
 
     pa_operation *op = pa_context_get_sink_info_by_name(_ctx, sink.c_str(), sink_info_callback, alarm.get());
     if (!op) {
@@ -305,4 +305,4 @@ namespace wsa::pulse {
     return true;
   }
 
-}  // namespace wsa::pulse
+}  // namespace weba::pulse

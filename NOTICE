@@ -36,7 +36,7 @@ The Linux audio capture path here is ported from these Sunshine sources:
 
   src/audio.h and src/audio.cpp
       The blocking pull interface (Sunshine's mic_t::sample() and this
-      library's wsa_capture_read_frame()), the fixed frame size derived from
+      library's weba_capture_read_frame()), the fixed frame size derived from
       the packet duration, the 48 kHz float32 format, the bounded frame queue
       with drop-oldest overflow, and the reinit-on-failure retry behaviour.
 

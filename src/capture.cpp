@@ -7,7 +7,7 @@
  * Derived from Sunshine (LizardByte), GPL-3.0. See NOTICE.
  */
 
-#include "wsacapture.h"
+#include "webacapture.h"
 
 #include "frame_queue.h"
 #include "log.h"
@@ -40,7 +40,7 @@ namespace {
    * spin while the device stays away. */
   constexpr auto kReinitDelay = std::chrono::milliseconds {1000};
 
-  /* wsa_capture_stop() waits this long for the capture thread. See the note on
+  /* weba_capture_stop() waits this long for the capture thread. See the note on
    * pa_simple_read in stop() for why the wait is bounded. */
   constexpr auto kJoinTimeout = std::chrono::milliseconds {3000};
 
@@ -50,14 +50,14 @@ namespace {
 }  // namespace
 
 /**
- * @brief The opaque handle behind wsa_capture.
+ * @brief The opaque handle behind weba_capture.
  */
-struct wsa_capture {
+struct weba_capture {
   /* Resolved configuration. */
   uint32_t sample_rate = kDefaultSampleRate;
   uint32_t channels = kDefaultChannels;
   uint32_t frame_samples = kDefaultFrameSamples;
-  wsa_sample_format format = WSA_SAMPLE_F32LE;
+  weba_sample_format format = WEBA_SAMPLE_F32LE;
   std::string requested_sink;
   uint32_t queue_frames = kDefaultQueueFrames;
   bool fixed_rate = true;
@@ -68,8 +68,8 @@ struct wsa_capture {
   std::string current_monitor;
   std::chrono::steady_clock::time_point next_sink_check {};
 
-  wsa::pulse::control_t control;
-  wsa::frame_queue_t queue;
+  weba::pulse::control_t control;
+  weba::frame_queue_t queue;
 
   std::thread thread;
   std::atomic<bool> running {false};
@@ -80,7 +80,7 @@ struct wsa_capture {
   std::atomic<uint32_t> pending_flags {0};
 
   mutable std::mutex format_lock;
-  wsa_format_info format_info {};
+  weba_format_info format_info {};
 
   mutable std::mutex error_lock;
   std::string error;
@@ -99,11 +99,11 @@ struct wsa_capture {
   std::size_t frame_bytes() const {
     std::size_t bytes_per_sample = 0;
     switch (format) {
-      case WSA_SAMPLE_S16LE:
+      case WEBA_SAMPLE_S16LE:
         bytes_per_sample = 2;
         break;
-      case WSA_SAMPLE_F32LE:
-      case WSA_SAMPLE_S32LE:
+      case WEBA_SAMPLE_F32LE:
+      case WEBA_SAMPLE_S32LE:
         bytes_per_sample = 4;
         break;
     }
@@ -115,7 +115,7 @@ struct wsa_capture {
       std::scoped_lock lock {error_lock};
       error = message;
     }
-    WSA_LOG_ERROR << message;
+    WEBA_LOG_ERROR << message;
   }
 
   std::string get_error() const {
@@ -135,7 +135,7 @@ struct wsa_capture {
     stop_cv.wait_for(lock, delay, [this] { return stop_requested.load(); });
   }
 
-  void publish_format(const wsa::pulse::target_t &target) {
+  void publish_format(const weba::pulse::target_t &target) {
     std::scoped_lock lock {format_lock};
     format_info.sample_rate = sample_rate;
     format_info.channels = channels;
@@ -148,19 +148,19 @@ struct wsa_capture {
   void capture_loop();
 };
 
-void wsa_capture::capture_loop() {
-  const wsa::pulse::mic_format_t mic_format {sample_rate, channels, format, frame_samples};
+void weba_capture::capture_loop() {
+  const weba::pulse::mic_format_t mic_format {sample_rate, channels, format, frame_samples};
   const std::size_t bytes = frame_bytes();
 
   std::vector<std::uint8_t> buffer(bytes, 0);
-  std::unique_ptr<wsa::pulse::mic_t> mic;
+  std::unique_ptr<weba::pulse::mic_t> mic;
   bool had_stream = false;
 
   while (!stop_requested.load()) {
     if (!mic) {
       /* Resolve on every (re)open, so switching the default sink is picked up
        * the same way Sunshine picks it up on its reinit path. */
-      wsa::pulse::target_t target;
+      weba::pulse::target_t target;
       if (!control.resolve_target(requested_sink, target)) {
         set_error(control.error());
         if (wait_for_stop(kReinitDelay)) {
@@ -172,10 +172,10 @@ void wsa_capture::capture_loop() {
       publish_format(target);
 
       std::string open_error;
-      mic = wsa::pulse::mic_t::open(target.monitor, mic_format, open_error);
+      mic = weba::pulse::mic_t::open(target.monitor, mic_format, open_error);
       if (!mic) {
         set_error(open_error);
-        pending_flags.fetch_or(WSA_FRAME_REINIT | WSA_FRAME_DISCONTINUITY);
+        pending_flags.fetch_or(WEBA_FRAME_REINIT | WEBA_FRAME_DISCONTINUITY);
         if (wait_for_stop(kReinitDelay)) {
           break;
         }
@@ -188,7 +188,7 @@ void wsa_capture::capture_loop() {
       /* Only a reopen is a discontinuity; the first stream has nothing before
        * it to be discontinuous with. */
       if (had_stream) {
-        pending_flags.fetch_or(WSA_FRAME_REINIT | WSA_FRAME_DISCONTINUITY);
+        pending_flags.fetch_or(WEBA_FRAME_REINIT | WEBA_FRAME_DISCONTINUITY);
       }
       had_stream = true;
     }
@@ -197,7 +197,7 @@ void wsa_capture::capture_loop() {
     if (!mic->read(buffer.data(), bytes, read_error)) {
       set_error(read_error);
       mic.reset();
-      pending_flags.fetch_or(WSA_FRAME_REINIT | WSA_FRAME_DISCONTINUITY);
+      pending_flags.fetch_or(WEBA_FRAME_REINIT | WEBA_FRAME_DISCONTINUITY);
       if (wait_for_stop(kReinitDelay)) {
         break;
       }
@@ -214,9 +214,9 @@ void wsa_capture::capture_loop() {
     if (requested_sink.empty() && sink_recheck_ms > 0 && std::chrono::steady_clock::now() >= next_sink_check) {
       next_sink_check = std::chrono::steady_clock::now() + std::chrono::milliseconds {sink_recheck_ms};
 
-      wsa::pulse::target_t target;
+      weba::pulse::target_t target;
       if (control.resolve_target("", target) && target.monitor != current_monitor) {
-        WSA_LOG_INFO << "default sink moved to " << target.sink << ", reopening capture";
+        WEBA_LOG_INFO << "default sink moved to " << target.sink << ", reopening capture";
         /* Flagged by the reopen path below, which is also what reports a
          * reopen caused by a failure, so this is not flagged here: doing both
          * would report a single reopen twice. */
@@ -225,25 +225,25 @@ void wsa_capture::capture_loop() {
     }
   }
 
-  /* Wakes whoever is waiting in wsa_capture_stop(). The wait predicate reads
+  /* Wakes whoever is waiting in weba_capture_stop(). The wait predicate reads
    * this atomic, so notifying after the store cannot be lost. */
   running.store(false);
   stop_cv.notify_all();
 
-  WSA_LOG_INFO << "capture thread exiting";
+  WEBA_LOG_INFO << "capture thread exiting";
 }
 
 /* -------------------------------------------------------------------------
  * Public API
  * ------------------------------------------------------------------------- */
 
-void wsa_config_defaults(wsa_config *cfg) {
+void weba_config_defaults(weba_config *cfg) {
   if (!cfg) {
     return;
   }
   cfg->sample_rate = kDefaultSampleRate;
   cfg->channels = kDefaultChannels;
-  cfg->format = WSA_SAMPLE_F32LE;
+  cfg->format = WEBA_SAMPLE_F32LE;
   cfg->frame_samples = kDefaultFrameSamples;
   cfg->sink = nullptr;
   cfg->ring_frames = kDefaultQueueFrames;
@@ -251,15 +251,15 @@ void wsa_config_defaults(wsa_config *cfg) {
   cfg->sink_recheck_ms = kDefaultSinkRecheckMs;
 }
 
-int wsa_capture_create(const wsa_config *cfg, wsa_capture **out) {
+int weba_capture_create(const weba_config *cfg, weba_capture **out) {
   if (!out) {
-    return WSA_ERR_INVAL;
+    return WEBA_ERR_INVAL;
   }
   *out = nullptr;
 
-  auto capture = std::unique_ptr<wsa_capture> {new (std::nothrow) wsa_capture {}};
+  auto capture = std::unique_ptr<weba_capture> {new (std::nothrow) weba_capture {}};
   if (!capture) {
-    return WSA_ERR_NOMEM;
+    return WEBA_ERR_NOMEM;
   }
 
   /* Apply the configuration, resolving the documented zero-value defaults. */
@@ -275,34 +275,34 @@ int wsa_capture_create(const wsa_config *cfg, wsa_capture **out) {
   }
 
   if (capture->sample_rate == 0 || capture->frame_samples == 0 || capture->channels == 0) {
-    return WSA_ERR_INVAL;
+    return WEBA_ERR_INVAL;
   }
-  if (!wsa::pulse::channels_supported(capture->channels)) {
-    return WSA_ERR_FORMAT;
+  if (!weba::pulse::channels_supported(capture->channels)) {
+    return WEBA_ERR_FORMAT;
   }
-  if (capture->format != WSA_SAMPLE_F32LE && capture->format != WSA_SAMPLE_S16LE &&
-      capture->format != WSA_SAMPLE_S32LE) {
-    return WSA_ERR_FORMAT;
+  if (capture->format != WEBA_SAMPLE_F32LE && capture->format != WEBA_SAMPLE_S16LE &&
+      capture->format != WEBA_SAMPLE_S32LE) {
+    return WEBA_ERR_FORMAT;
   }
 
   if (!capture->queue.init(capture->frame_bytes(), capture->queue_frames)) {
-    return WSA_ERR_NOMEM;
+    return WEBA_ERR_NOMEM;
   }
 
   *out = capture.release();
-  return WSA_OK;
+  return WEBA_OK;
 }
 
-int wsa_capture_start(wsa_capture *c) {
+int weba_capture_start(weba_capture *c) {
   if (!c) {
-    return WSA_ERR_INVAL;
+    return WEBA_ERR_INVAL;
   }
   if (c->running.load()) {
-    return WSA_ERR_STATE;
+    return WEBA_ERR_STATE;
   }
 
   const int status = c->control.init();
-  if (status != WSA_OK) {
+  if (status != WEBA_OK) {
     c->set_error(c->control.error());
     return status;
   }
@@ -311,11 +311,11 @@ int wsa_capture_start(wsa_capture *c) {
    * bad sink name fails the start and the format is readable immediately
    * afterwards. The thread resolves again on every (re)open, which is what
    * makes it follow a changed default sink. */
-  wsa::pulse::target_t target;
+  weba::pulse::target_t target;
   if (!c->control.resolve_target(c->requested_sink, target)) {
     c->set_error(c->control.error());
     c->control.shutdown();
-    return WSA_ERR_PULSE;
+    return WEBA_ERR_PULSE;
   }
   c->publish_format(target);
 
@@ -323,22 +323,22 @@ int wsa_capture_start(wsa_capture *c) {
   c->running.store(true);
   c->thread = std::thread([c] { c->capture_loop(); });
 
-  WSA_LOG_INFO << "capture started: " << c->sample_rate << " Hz, " << c->channels << " ch, "
+  WEBA_LOG_INFO << "capture started: " << c->sample_rate << " Hz, " << c->channels << " ch, "
                << c->frame_samples << " frames/frame (" << frame_duration_ms(c->frame_samples, c->sample_rate)
                << " ms), sink '" << (c->requested_sink.empty() ? "default" : c->requested_sink) << "'";
-  return WSA_OK;
+  return WEBA_OK;
 }
 
-int wsa_capture_read_frame(wsa_capture *c, void *dst, uint32_t dst_capacity_frames, wsa_frame_info *info,
+int weba_capture_read_frame(weba_capture *c, void *dst, uint32_t dst_capacity_frames, weba_frame_info *info,
                            int timeout_ms) {
   if (!c || !dst) {
-    return WSA_ERR_INVAL;
+    return WEBA_ERR_INVAL;
   }
   if (!c->running.load()) {
-    return WSA_ERR_STATE;
+    return WEBA_ERR_STATE;
   }
   if (dst_capacity_frames < c->frame_samples) {
-    return WSA_ERR_INVAL;
+    return WEBA_ERR_INVAL;
   }
   if (timeout_ms < 0) {
     timeout_ms = 0;
@@ -366,7 +366,7 @@ int wsa_capture_read_frame(wsa_capture *c, void *dst, uint32_t dst_capacity_fram
       std::size_t discarded = 0;
       const int result = c->queue.pop(dst, &discarded, wait);
       if (result < 0) {
-        return WSA_ERR_STATE;
+        return WEBA_ERR_STATE;
       }
       total_discarded += discarded;
 
@@ -406,7 +406,7 @@ int wsa_capture_read_frame(wsa_capture *c, void *dst, uint32_t dst_capacity_fram
     std::size_t discarded = 0;
     const int result = c->queue.pop(dst, &discarded, zero);
     if (result < 0) {
-      return WSA_ERR_STATE;
+      return WEBA_ERR_STATE;
     }
     total_discarded += discarded;
 
@@ -414,11 +414,11 @@ int wsa_capture_read_frame(wsa_capture *c, void *dst, uint32_t dst_capacity_fram
      * required to initialize. */
     uint32_t flags = c->pending_flags.exchange(0);
     if (total_discarded > 0) {
-      flags |= WSA_FRAME_DISCONTINUITY;
+      flags |= WEBA_FRAME_DISCONTINUITY;
     }
     if (result == 0) {
       std::memset(dst, 0, bytes);
-      flags |= WSA_FRAME_SILENCE | WSA_FRAME_UNDERRUN;
+      flags |= WEBA_FRAME_SILENCE | WEBA_FRAME_UNDERRUN;
     }
 
     /* Advance by exactly one period so the cadence does not drift, but resync
@@ -443,27 +443,27 @@ int wsa_capture_read_frame(wsa_capture *c, void *dst, uint32_t dst_capacity_fram
       std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch())
         .count());
     info->flags = c->pending_flags.exchange(0) |
-                  (total_discarded > 0 ? WSA_FRAME_DISCONTINUITY : 0u);
+                  (total_discarded > 0 ? WEBA_FRAME_DISCONTINUITY : 0u);
     info->dropped_frames = static_cast<uint32_t>(total_discarded);
   }
 
   return 1;
 }
 
-int wsa_capture_get_format(wsa_capture *c, wsa_format_info *out) {
+int weba_capture_get_format(weba_capture *c, weba_format_info *out) {
   if (!c || !out) {
-    return WSA_ERR_INVAL;
+    return WEBA_ERR_INVAL;
   }
   std::scoped_lock lock {c->format_lock};
   *out = c->format_info;
-  return WSA_OK;
+  return WEBA_OK;
 }
 
-int wsa_capture_is_running(wsa_capture *c) {
+int weba_capture_is_running(weba_capture *c) {
   return c && c->running.load() ? 1 : 0;
 }
 
-void wsa_capture_stop(wsa_capture *c) {
+void weba_capture_stop(weba_capture *c) {
   if (!c) {
     return;
   }
@@ -495,7 +495,7 @@ void wsa_capture_stop(wsa_capture *c) {
       c->thread.join();
     }
     else {
-      WSA_LOG_ERROR << "capture thread did not exit within " << kJoinTimeout.count()
+      WEBA_LOG_ERROR << "capture thread did not exit within " << kJoinTimeout.count()
                     << " ms; it is blocked in pa_simple_read() on a source that is not delivering audio. "
                        "Abandoning the thread and leaking this handle rather than freeing memory in use.";
       c->thread.detach();
@@ -509,22 +509,22 @@ void wsa_capture_stop(wsa_capture *c) {
   }
 }
 
-void wsa_capture_destroy(wsa_capture *c) {
+void weba_capture_destroy(weba_capture *c) {
   if (!c) {
     return;
   }
 
-  wsa_capture_stop(c);
+  weba_capture_stop(c);
 
   if (c->thread_abandoned) {
-    /* The capture thread is still using this object. See wsa_capture_stop(). */
+    /* The capture thread is still using this object. See weba_capture_stop(). */
     return;
   }
 
   delete c;
 }
 
-const char *wsa_capture_last_error(wsa_capture *c) {
+const char *weba_capture_last_error(weba_capture *c) {
   static const std::string empty;
   if (!c) {
     return empty.c_str();
@@ -535,23 +535,23 @@ const char *wsa_capture_last_error(wsa_capture *c) {
   return buffer.c_str();
 }
 
-const char *wsa_version_string(void) {
+const char *weba_version_string(void) {
   return "1.0.0";
 }
 
-const char *wsa_strerror(int status) {
+const char *weba_strerror(int status) {
   switch (status) {
-    case WSA_OK:
+    case WEBA_OK:
       return "success";
-    case WSA_ERR_INVAL:
+    case WEBA_ERR_INVAL:
       return "invalid argument";
-    case WSA_ERR_NOMEM:
+    case WEBA_ERR_NOMEM:
       return "out of memory";
-    case WSA_ERR_PULSE:
+    case WEBA_ERR_PULSE:
       return "audio server error";
-    case WSA_ERR_FORMAT:
+    case WEBA_ERR_FORMAT:
       return "unsupported audio format";
-    case WSA_ERR_STATE:
+    case WEBA_ERR_STATE:
       return "invalid state for this operation";
     default:
       break;
