@@ -33,6 +33,7 @@ namespace {
   constexpr uint32_t kDefaultChannels = 2;
   constexpr uint32_t kDefaultFrameSamples = 960;  ///< 20 ms at 48 kHz
   constexpr uint32_t kDefaultQueueFrames = 100;   ///< ~2 s at 20 ms
+  constexpr uint32_t kDefaultSinkRecheckMs = 1000;
 
   /* After a failure the stream is reopened on this period, mirroring Sunshine's
    * retry gate: fast enough to recover from a device switch, slow enough not to
@@ -60,6 +61,12 @@ struct wsa_capture {
   std::string requested_sink;
   uint32_t queue_frames = kDefaultQueueFrames;
   bool fixed_rate = true;
+  uint32_t sink_recheck_ms = kDefaultSinkRecheckMs;
+
+  /* The monitor currently being recorded, used to notice when the default sink
+   * has moved somewhere else. */
+  std::string current_monitor;
+  std::chrono::steady_clock::time_point next_sink_check {};
 
   wsa::pulse::control_t control;
   wsa::frame_queue_t queue;
@@ -175,6 +182,9 @@ void wsa_capture::capture_loop() {
         continue;
       }
 
+      current_monitor = target.monitor;
+      next_sink_check = std::chrono::steady_clock::now() + std::chrono::milliseconds {sink_recheck_ms};
+
       /* Only a reopen is a discontinuity; the first stream has nothing before
        * it to be discontinuous with. */
       if (had_stream) {
@@ -195,6 +205,22 @@ void wsa_capture::capture_loop() {
     }
 
     queue.push(buffer.data());
+
+    /* Following the default sink needs polling: switching the default does not
+     * disturb the stream we already hold, because the monitor of the old sink
+     * keeps delivering, so nothing fails and the reopen path never runs. Only
+     * done when the sink is unpinned, since a pinned one must not be followed
+     * away from. */
+    if (requested_sink.empty() && sink_recheck_ms > 0 && std::chrono::steady_clock::now() >= next_sink_check) {
+      next_sink_check = std::chrono::steady_clock::now() + std::chrono::milliseconds {sink_recheck_ms};
+
+      wsa::pulse::target_t target;
+      if (control.resolve_target("", target) && target.monitor != current_monitor) {
+        WSA_LOG_INFO << "default sink moved to " << target.sink << ", reopening capture";
+        mic.reset();
+        pending_flags.fetch_or(WSA_FRAME_REINIT | WSA_FRAME_DISCONTINUITY);
+      }
+    }
   }
 
   /* Wakes whoever is waiting in wsa_capture_stop(). The wait predicate reads
@@ -220,6 +246,7 @@ void wsa_config_defaults(wsa_config *cfg) {
   cfg->sink = nullptr;
   cfg->ring_frames = kDefaultQueueFrames;
   cfg->fixed_rate = 1;
+  cfg->sink_recheck_ms = kDefaultSinkRecheckMs;
 }
 
 int wsa_capture_create(const wsa_config *cfg, wsa_capture **out) {
@@ -242,6 +269,7 @@ int wsa_capture_create(const wsa_config *cfg, wsa_capture **out) {
     capture->requested_sink = cfg->sink ? cfg->sink : "";
     capture->queue_frames = cfg->ring_frames ? cfg->ring_frames : kDefaultQueueFrames;
     capture->fixed_rate = cfg->fixed_rate != 0;
+    capture->sink_recheck_ms = cfg->sink_recheck_ms ? cfg->sink_recheck_ms : kDefaultSinkRecheckMs;
   }
 
   if (capture->sample_rate == 0 || capture->frame_samples == 0 || capture->channels == 0) {

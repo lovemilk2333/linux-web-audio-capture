@@ -80,6 +80,10 @@ typedef struct {
      * the caller still gets a frame per period at a fixed rate. This keeps a
      * stream flowing while the desktop is silent or the sink is suspended. */
     int fixed_rate;
+    /* How often, in milliseconds, to check whether the default sink has changed
+     * while capturing it. 0 => 1000. Only applies when sink is unset: a pinned
+     * sink is never followed away from. Set this high to stop checking. */
+    uint32_t sink_recheck_ms;
 } wsa_config;
 
 /* The format and sink actually in use. */
