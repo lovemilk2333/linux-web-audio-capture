@@ -173,17 +173,15 @@ namespace weba::pulse {
   }
 
   void control_t::shutdown() {
-    /* Mirror Sunshine's teardown order: disconnect, wait for the state to
-     * settle, stop the loop, then release the objects. */
-    if (_ctx) {
-      pa_context_disconnect(_ctx);
-
-      std::unique_lock lock {_state_lock};
-      _state_cv.wait_for(lock, kQueryTimeout, [this] {
-        return _terminated || _failed;
-      });
-    }
-
+    /* Everything below runs with the main loop stopped and joined, so no
+     * libpulse call here ever races the loop thread.
+     *
+     * Sunshine disconnects first and then stops the loop, which is what this
+     * did too. The context API is not thread safe, though, and that order asks
+     * the loop thread to keep processing while another thread mutates the
+     * context — including while pa_context_disconnect tears down the very
+     * structures those callbacks use. Stopping the loop first costs the
+     * disconnect message, which the socket close conveys anyway. */
     if (_mainloop) {
       pa_mainloop_quit(_mainloop, 0);
     }
@@ -193,6 +191,7 @@ namespace weba::pulse {
     }
 
     if (_ctx) {
+      pa_context_disconnect(_ctx);
       pa_context_unref(_ctx);
       _ctx = nullptr;
     }
