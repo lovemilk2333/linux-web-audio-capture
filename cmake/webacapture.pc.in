@@ -1,7 +1,12 @@
-prefix=@CMAKE_INSTALL_PREFIX@
+# Paths are derived from ${pcfiledir}, the directory pkg-config found this file
+# in, rather than baked in at configure time. That is what makes the file
+# correct under `cmake --install --prefix <somewhere else>`: a configure-time
+# prefix would still name the default location and quietly point at a tree the
+# library was never installed into.
+prefix=${pcfiledir}/@PC_REL_PREFIX@
 exec_prefix=${prefix}
-libdir=@CMAKE_INSTALL_FULL_LIBDIR@
-includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
 
 Name: webacapture
 Description: @PROJECT_DESCRIPTION@

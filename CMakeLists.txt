@@ -67,6 +67,12 @@ add_test(NAME selftest COMMAND webaudio_selftest)
 
 include(GNUInstallDirs)
 
+# Depth from the pkgconfig directory back up to the install prefix, so the
+# generated .pc can be relocatable rather than naming a configure-time path.
+file(RELATIVE_PATH PC_REL_PREFIX
+  "${CMAKE_INSTALL_FULL_LIBDIR}/pkgconfig" "${CMAKE_INSTALL_PREFIX}")
+string(REGEX REPLACE "/$" "" PC_REL_PREFIX "${PC_REL_PREFIX}")
+
 configure_file(cmake/webacapture.pc.in webacapture.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/webacapture.pc
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
