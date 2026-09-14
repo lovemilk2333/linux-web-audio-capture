@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.16)
 
-project(linux-ws-audio-capture
+project(linux-web-audio-capture
   VERSION 1.0.0
   DESCRIPTION "Real-time desktop audio capture exposed as a C ABI"
   LANGUAGES C CXX)
@@ -11,6 +11,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+# Record the build tree's rpath relative to $ORIGIN. Without this CMake bakes in
+# absolute paths, so moving or renaming the checkout leaves the test binaries
+# unable to find libwebaudio.so until they are rebuilt.
+set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)

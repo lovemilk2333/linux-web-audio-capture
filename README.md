@@ -1,10 +1,10 @@
-# linux-ws-audio-capture
+# linux-web-audio-capture
 
 Real-time desktop audio capture for Linux, built as a shared library with a pure
 C ABI. It records what the desktop is playing and hands it to a caller one
 fixed-size frame at a time.
 
-This is the capture half of [linux-ws-audio](../linux-ws-audio), which wraps it
+This is the capture half of [linux-web-audio](../linux-web-audio), which wraps it
 in a Go HTTP server. It is usable on its own.
 
 ## What it does
