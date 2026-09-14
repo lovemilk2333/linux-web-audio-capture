@@ -1,0 +1,56 @@
+linux-ws-audio-capture
+Copyright (C) 2026 lovemilk
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program. If not, see <https://www.gnu.org/licenses/>.
+
+================================================================================
+Derivation
+================================================================================
+
+This library is a derivative work of Sunshine, which is licensed under the GNU
+General Public License v3.0. Accordingly this library is distributed under the
+same license, GPL-3.0-or-later.
+
+    Sunshine - https://github.com/LizardByte/Sunshine
+    Copyright (C) LizardByte and contributors
+    Licensed under the GNU General Public License v3.0
+
+The Linux audio capture path here is ported from these Sunshine sources:
+
+  src/platform/linux/audio.cpp
+      The pa::server_t control layer (pa_mainloop/pa_context setup, the state
+      callback, the thread running pa_mainloop_run, the teardown order), sink
+      and default-sink queries, monitor-source resolution via
+      pa_sink_info::monitor_source_name, and the pa_simple recording stream
+      with its pa_sample_spec / pa_channel_map / pa_buffer_attr construction.
+
+  src/audio.h and src/audio.cpp
+      The blocking pull interface (Sunshine's mic_t::sample() and this
+      library's wsa_capture_read_frame()), the fixed frame size derived from
+      the packet duration, the 48 kHz float32 format, the bounded frame queue
+      with drop-oldest overflow, and the reinit-on-failure retry behaviour.
+
+  src/platform/linux/pipewire.cpp
+      Reference for the control layer's threading and teardown patterns.
+
+No Sunshine source file was copied wholesale. What was carried over is the
+architecture and the libpulse API usage; Sunshine's infrastructure dependencies
+(boost.log, safe::alarm_raw_t, safe::event_t, util::safe_ptr, util::fail_guard)
+were replaced by src/primitives.h, and the public interface here is a pure C ABI
+rather than Sunshine's C++ mic_t / audio_control_t class hierarchy.
+
+Note that Sunshine's audio files carry no per-file copyright headers, so there
+were no per-file notices to preserve. The project-level attribution above is
+made under GPL-3.0 section 5(a).
+
+See README.md for the list of deliberate differences from Sunshine.
