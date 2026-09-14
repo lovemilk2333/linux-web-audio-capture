@@ -112,7 +112,7 @@ namespace weba {
      * @param timeout How long to wait when empty.
      * @return 1 on a frame, 0 on timeout, -1 if the queue was closed.
      */
-    int pop(void *out, std::size_t *discarded, std::chrono::milliseconds timeout) {
+    int pop(void *out, std::size_t *discarded, std::chrono::microseconds timeout) {
       std::unique_lock lock {_lock};
       _cv.wait_for(lock, timeout, [this] { return _count > 0 || _closed; });
 

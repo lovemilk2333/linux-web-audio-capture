@@ -21,6 +21,7 @@
 #include <condition_variable>
 #include <cstdio>
 #include <cstring>
+#include <string>
 #include <memory>
 #include <mutex>
 #include <new>
@@ -44,8 +45,36 @@ namespace {
    * pa_simple_read in stop() for why the wait is bounded. */
   constexpr auto kJoinTimeout = std::chrono::milliseconds {3000};
 
-  uint32_t frame_duration_ms(uint32_t frame_samples, uint32_t sample_rate) {
-    return static_cast<uint32_t>((static_cast<uint64_t>(frame_samples) * 1000) / sample_rate);
+  /**
+   * @brief Exact duration of one frame.
+   *
+   * Microseconds, not milliseconds. Opus allows frame durations such as 2.5 ms,
+   * and rounding those to a whole millisecond is not a display detail: the
+   * capture thread paces its silence fill from this, so a 2.5 ms frame timed as
+   * 2 ms emits frames 25% faster than real time.
+   */
+  std::chrono::microseconds frame_period(uint32_t frame_samples, uint32_t sample_rate) {
+    return std::chrono::microseconds {(static_cast<int64_t>(frame_samples) * 1'000'000) / sample_rate};
+  }
+
+  /// @brief Frame duration rendered for a log line, keeping any fraction.
+  std::string frame_period_text(uint32_t frame_samples, uint32_t sample_rate) {
+    const auto period = frame_period(frame_samples, sample_rate);
+    const auto whole = std::chrono::duration_cast<std::chrono::milliseconds>(period);
+    if (period == whole) {
+      return std::to_string(whole.count()) + " ms";
+    }
+    char text[32];
+    std::snprintf(text, sizeof(text), "%.3f", static_cast<double>(period.count()) / 1000.0);
+    std::string rendered {text};
+    // "2.500" reads as noise; trim back to "2.5".
+    while (rendered.size() > 1 && rendered.back() == '0') {
+      rendered.pop_back();
+    }
+    if (!rendered.empty() && rendered.back() == '.') {
+      rendered.pop_back();
+    }
+    return rendered + " ms";
   }
 }  // namespace
 
@@ -124,13 +153,13 @@ struct weba_capture {
   }
 
   /// @brief Sleep for @p delay, returning true if a stop was requested first.
-  bool wait_for_stop(std::chrono::milliseconds delay) {
+  bool wait_for_stop(std::chrono::microseconds delay) {
     std::unique_lock lock {stop_lock};
     return stop_cv.wait_for(lock, delay, [this] { return stop_requested.load(); });
   }
 
   /// @brief Sleep for @p delay, waking early if a stop is requested.
-  void sleep_interruptible(std::chrono::milliseconds delay) {
+  void sleep_interruptible(std::chrono::microseconds delay) {
     std::unique_lock lock {stop_lock};
     stop_cv.wait_for(lock, delay, [this] { return stop_requested.load(); });
   }
@@ -324,8 +353,8 @@ int weba_capture_start(weba_capture *c) {
   c->thread = std::thread([c] { c->capture_loop(); });
 
   WEBA_LOG_INFO << "capture started: " << c->sample_rate << " Hz, " << c->channels << " ch, "
-               << c->frame_samples << " frames/frame (" << frame_duration_ms(c->frame_samples, c->sample_rate)
-               << " ms), sink '" << (c->requested_sink.empty() ? "default" : c->requested_sink) << "'";
+               << c->frame_samples << " frames/frame (" << frame_period_text(c->frame_samples, c->sample_rate)
+               << "), sink '" << (c->requested_sink.empty() ? "default" : c->requested_sink) << "'";
   return WEBA_OK;
 }
 
@@ -345,10 +374,10 @@ int weba_capture_read_frame(weba_capture *c, void *dst, uint32_t dst_capacity_fr
   }
 
   const std::size_t bytes = c->frame_bytes();
-  const auto period = std::chrono::milliseconds {frame_duration_ms(c->frame_samples, c->sample_rate)};
+  const auto period = frame_period(c->frame_samples, c->sample_rate);
   const auto call_deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds {timeout_ms};
-  const auto zero = std::chrono::milliseconds {0};
-  const auto one_ms = std::chrono::milliseconds {1};
+  const auto zero = std::chrono::microseconds {0};
+  const auto one_ms = std::chrono::microseconds {1000};
 
   std::size_t total_discarded = 0;
 
@@ -358,7 +387,7 @@ int weba_capture_read_frame(weba_capture *c, void *dst, uint32_t dst_capacity_fr
     if (!c->fixed_rate) {
       /* Without fixed-rate output the caller's timeout is the only deadline,
        * and a timeout is reported honestly rather than filled in. */
-      auto wait = std::chrono::duration_cast<std::chrono::milliseconds>(call_deadline - now);
+      auto wait = std::chrono::duration_cast<std::chrono::microseconds>(call_deadline - now);
       if (wait < zero) {
         wait = zero;
       }
@@ -389,8 +418,8 @@ int weba_capture_read_frame(weba_capture *c, void *dst, uint32_t dst_capacity_fr
      * delivers a burst: the burst stays queued and is drained one frame per
      * period, instead of being handed out as fast as it arrives. */
     if (now < c->next_deadline) {
-      auto wait = std::chrono::duration_cast<std::chrono::milliseconds>(c->next_deadline - now) + one_ms;
-      const auto until_call_deadline = std::chrono::duration_cast<std::chrono::milliseconds>(call_deadline - now);
+      auto wait = std::chrono::duration_cast<std::chrono::microseconds>(c->next_deadline - now) + one_ms;
+      const auto until_call_deadline = std::chrono::duration_cast<std::chrono::microseconds>(call_deadline - now);
       if (until_call_deadline < wait) {
         wait = until_call_deadline;
       }
